@@ -1,0 +1,53 @@
+# Build & publish a Windows self-contained single-file .exe for the WPF Desktop project
+name: Build & Publish (Windows)
+
+on:
+  push:
+    paths:
+      - '**.sln'
+      - 'src/**'
+  pull_request:
+    paths:
+      - '**.sln'
+      - 'src/**'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        dotnet: [ '6.0.x' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Restore NuGet packages
+        run: dotnet restore Ag-Lancher.sln
+
+      - name: Build solution (Release)
+        run: dotnet build Ag-Lancher.sln -c Release --no-restore -v minimal
+
+      - name: Publish Desktop app (x64) as single-file exe
+        working-directory: src/Desktop
+        run: |
+          rem Publish a self-contained single-file exe for Windows x64.
+          rem This will create the exe under src/Desktop/publish/
+          dotnet publish AgLauncher.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish
+
+      - name: Upload published artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgLauncher-windows
+          path: |
+            src/Desktop/publish/**
+
+      - name: Show published files (for logs)
+        if: always()
+        run: dir /s src\Desktop\publish || true
